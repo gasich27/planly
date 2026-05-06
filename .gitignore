@@ -1,0 +1,33 @@
+# Backend
+backend/__pycache__/
+backend/*.pyc
+backend/*.pyo
+backend/*.pyd
+backend/.env
+backend/.vscode/
+backend/.idea/
+backend/planner.db
+backend/plan.json
+backend/*.ics
+backend/*.mp3
+backend/*.ogg
+backend/*.log
+
+# Mobile / Flutter
+mobile/.dart_tool/
+mobile/build/
+mobile/.idea/
+mobile/.flutter-plugins
+mobile/.flutter-plugins-dependencies
+mobile/.packages
+mobile/.metadata
+mobile/*.iml
+mobile/android/.gradle/
+mobile/android/local.properties
+mobile/ios/Pods/
+mobile/ios/Runner.xcworkspace/
+mobile/Vector(1).png
+
+# General
+.DS_Store
+Thumbs.db
