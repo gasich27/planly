@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+.vscode/
+.idea/
+planner.db
+plan.json
+*.ics
+*.mp3
+*.ogg
+*.log

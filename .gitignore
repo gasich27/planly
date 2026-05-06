@@ -1,8 +1,8 @@
 # Backend
-backend/__pycache__/
-backend/*.pyc
-backend/*.pyo
-backend/*.pyd
+backend/**/__pycache__/
+backend/**/*.pyc
+backend/**/*.pyo
+backend/**/*.pyd
 backend/.env
 backend/.vscode/
 backend/.idea/
