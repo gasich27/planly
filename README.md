@@ -1,4 +1,4 @@
-# AI Planner
+# PLANLY (AI Planner)
 
 Minimal backend for turning text or audio into a structured task plan.
 
