@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import tempfile
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from time import perf_counter
 from typing import Literal
@@ -15,7 +15,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, Field
 
 from core.stt import transcribe_audio
-from core.llm import generate_plan
+from core.llm import generate_plan, revise_plan
 from core.database import Database, append_plan_history_file
 from core.calendar import export_to_ics
 from core.config import get_settings
@@ -42,6 +42,89 @@ class PlanRequest(BaseModel):
 
 class TaskStatusRequest(BaseModel):
     status: Literal["pending", "done"]
+
+
+class AiEditRequest(BaseModel):
+    instruction: str = Field(min_length=1)
+
+
+def _task_date(task: dict[str, object], fallback: date) -> date:
+    value = task.get("scheduled_at") or task.get("deadline") or task.get("date")
+    if isinstance(value, str) and value.strip():
+        try:
+            return date.fromisoformat(value.strip()[:10])
+        except ValueError:
+            pass
+    return fallback
+
+
+def _context_range(context: str, today: date) -> tuple[date, date]:
+    normalized = context.strip().lower()
+    if normalized == "tomorrow":
+        tomorrow = today + timedelta(days=1)
+        return tomorrow, tomorrow
+    if normalized == "week":
+        return today, today + timedelta(days=6)
+    if normalized == "month":
+        if today.month == 12:
+            next_month = date(today.year + 1, 1, 1)
+        else:
+            next_month = date(today.year, today.month + 1, 1)
+        return today, next_month - timedelta(days=1)
+    return today, today
+
+
+def _build_dashboard(context: str) -> dict[str, object]:
+    today = datetime.now().astimezone().date()
+    start, end = _context_range(context, today)
+    plans = db.list_plans(limit=500, offset=0)
+    tasks: list[dict[str, object]] = []
+
+    for plan in plans:
+        structured = plan.get("structured_plan")
+        if not isinstance(structured, dict):
+            continue
+        created_value = plan.get("created_at")
+        try:
+            fallback = datetime.fromisoformat(str(created_value).replace("Z", "+00:00")).date()
+        except ValueError:
+            fallback = today
+        raw_tasks = structured.get("tasks")
+        if not isinstance(raw_tasks, list):
+            continue
+        for raw_task in raw_tasks:
+            if not isinstance(raw_task, dict):
+                continue
+            scheduled = _task_date(raw_task, fallback)
+            if not start <= scheduled <= end:
+                continue
+            task = dict(raw_task)
+            task["plan_id"] = int(plan.get("id", 0) or 0)
+            task["plan_title"] = str(structured.get("title", ""))
+            task["deadline"] = scheduled.isoformat()
+            tasks.append(task)
+
+    total = len(tasks)
+    completed = sum(1 for task in tasks if str(task.get("status", "pending")) == "done")
+    percentage = round((completed / total) * 100) if total else 0
+    priority_rank = {"high": 0, "medium": 1, "low": 2}
+    pending = [task for task in tasks if str(task.get("status", "pending")) != "done"]
+    pending.sort(
+        key=lambda task: (
+            priority_rank.get(str(task.get("priority", "low")).lower(), 3),
+            str(task.get("deadline", "")),
+            int(task.get("id", 0) or 0),
+        )
+    )
+    return {
+        "context": context.strip().lower() or "today",
+        "date": start.isoformat(),
+        "range_end": end.isoformat(),
+        "percentage": percentage,
+        "completed": completed,
+        "total": total,
+        "priority_tasks": pending[:3],
+    }
 
 
 def _json_error(error: str, detail: str, status_code: int) -> JSONResponse:
@@ -99,11 +182,13 @@ def _load_latest_plan_from_file() -> dict[str, object]:
                 {
                     "id": int(task.get("id", index)),
                     "title": str(task.get("title", "")).strip(),
+                    "description": str(task.get("description", "")).strip(),
                     "priority": str(task.get("priority", "low")).strip().lower(),
                     "estimated_min": int(task.get("estimated_min", task.get("estimatedMin", 15)) or 15),
                     "status": "pending",
                     "tags": tags,
                     "date": str(task.get("date")).strip() if task.get("date") else None,
+                    "scheduled_at": str(task.get("scheduled_at")).strip() if task.get("scheduled_at") else None,
                 }
             )
 
@@ -233,6 +318,20 @@ async def api_latest_plan() -> JSONResponse:
         return _json_error("latest_plan_error", str(exc), 500)
 
 
+# curl "http://127.0.0.1:8000/api/dashboard?context=today"
+@app.get("/api/dashboard")
+async def api_dashboard(context: str = "today") -> JSONResponse:
+    try:
+        if context.strip().lower() not in {"today", "tomorrow", "week", "month"}:
+            raise ValueError("context must be today, tomorrow, week or month")
+        dashboard = await asyncio.to_thread(_build_dashboard, context)
+        return JSONResponse(content=dashboard)
+    except (ValueError, TypeError) as exc:
+        return _json_error("dashboard_error", str(exc), 400)
+    except Exception as exc:
+        return _json_error("dashboard_error", str(exc), 500)
+
+
 # curl "http://127.0.0.1:8000/api/plans/1"
 @app.get("/api/plans/{plan_id}")
 async def api_get_plan(plan_id: int) -> JSONResponse:
@@ -269,6 +368,40 @@ async def api_update_task_status(plan_id: int, task_id: int, payload: TaskStatus
         return _json_error("status_error", str(exc), 400)
     except Exception as exc:
         return _json_error("status_error", str(exc), 500)
+
+
+# curl -X POST "http://127.0.0.1:8000/api/plans/1/ai-edit" -H "Content-Type: application/json" -d "{\"instruction\":\"Move task 2 to tomorrow\"}"
+@app.post("/api/plans/{plan_id}/ai-edit")
+async def api_ai_edit_plan(plan_id: int, payload: AiEditRequest) -> JSONResponse:
+    try:
+        current = await asyncio.to_thread(db.get_plan_with_tasks, plan_id)
+        if current is None:
+            return _json_error("not_found", f"Plan {plan_id} not found", 404)
+        structured = current.get("structured_plan")
+        if not isinstance(structured, dict):
+            raise ValueError("Plan has invalid structured data")
+        revised = await asyncio.to_thread(
+            revise_plan,
+            structured,
+            payload.instruction.strip(),
+            settings,
+        )
+        if structured.get("tasks") and not revised.tasks:
+            raise ValueError(revised.notes)
+        updated = await asyncio.to_thread(
+            db.replace_plan,
+            plan_id,
+            f"{current.get('raw_text', '')}\nAI edit: {payload.instruction.strip()}",
+            revised,
+        )
+        if not updated:
+            return _json_error("not_found", f"Plan {plan_id} not found", 404)
+        result = await asyncio.to_thread(db.get_plan_with_tasks, plan_id)
+        return JSONResponse(content=result)
+    except (ValueError, TypeError) as exc:
+        return _json_error("ai_edit_error", str(exc), 400)
+    except Exception as exc:
+        return _json_error("ai_edit_error", str(exc), 500)
 
 
 # curl -L "http://127.0.0.1:8000/api/export/1/ics" -o plan.ics

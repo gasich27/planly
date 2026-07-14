@@ -74,6 +74,7 @@ def _normalize_task(task: dict[str, Any], fallback_deadline: str, recorded_at: s
     task_copy = dict(task)
     task_copy["id"] = int(task_copy.get("id", 0) or 0)
     task_copy["title"] = str(task_copy.get("title", "")).strip()
+    task_copy["description"] = str(task_copy.get("description", "")).strip()
     task_copy["priority"] = str(task_copy.get("priority", "low")).strip().lower() or "low"
     if task_copy["priority"] not in {"high", "medium", "low"}:
         task_copy["priority"] = "low"
@@ -91,7 +92,12 @@ def _normalize_task(task: dict[str, Any], fallback_deadline: str, recorded_at: s
         tags = []
     task_copy["tags"] = list(dict.fromkeys(tags))
 
-    task_copy["deadline"] = _parse_deadline(task_copy.get("deadline") or task_copy.get("date"), fallback_deadline)
+    scheduled_at = task_copy.get("scheduled_at")
+    task_copy["scheduled_at"] = str(scheduled_at).strip() if scheduled_at else None
+    task_copy["deadline"] = _parse_deadline(
+        task_copy.get("deadline") or task_copy.get("date") or scheduled_at,
+        fallback_deadline,
+    )
     task_copy["recorded_at"] = str(task_copy.get("recorded_at") or recorded_at).strip() or recorded_at
     task_copy["status"] = str(task_copy.get("status", "pending")).strip().lower() or "pending"
     if task_copy["status"] not in {"pending", "done"}:
@@ -293,6 +299,35 @@ class Database:
                 (raw_text, structured_plan, recorded_at, period, "completed"),
             )
             return int(cursor.lastrowid)
+
+    def replace_plan(self, plan_id: int, raw_text: str, plan: Plan) -> bool:
+        existing = self._fetch_row(plan_id)
+        if existing is None:
+            return False
+        created_at = plan.created_at.astimezone(timezone.utc)
+        recorded_at = created_at.isoformat()
+        fallback_deadline = (created_at + timedelta(days=3)).date().isoformat()
+        payload = plan.model_dump(mode="json")
+        raw_tasks = payload.get("tasks", [])
+        payload["tasks"] = _sort_tasks(
+            [
+                _normalize_task(task, fallback_deadline, recorded_at)
+                for task in raw_tasks
+                if isinstance(task, dict)
+            ]
+        )
+        payload["recorded_at"] = recorded_at
+        payload["created_at"] = recorded_at
+        with self._connect() as conn:
+            cursor = conn.execute(
+                """
+                UPDATE plans
+                SET raw_text = ?, structured_plan = ?
+                WHERE id = ?
+                """,
+                (raw_text, json.dumps(payload, ensure_ascii=False), plan_id),
+            )
+            return cursor.rowcount > 0
 
     def list_plans(
         self,

@@ -12,8 +12,9 @@ load_dotenv()
 
 @dataclass(slots=True, frozen=True)
 class Settings:
-    api_base: str
-    api_key: str
+    ollama_base_url: str
+    ollama_model: str
+    ollama_models_dir: str
     whisper_model: str
     whisper_language: str
     db_path: str
@@ -28,8 +29,9 @@ def _read_setting(name: str, default: str) -> str:
 def get_settings() -> Settings:
     load_dotenv()
     return Settings(
-        api_base=_read_setting("OPENAI_API_BASE", "http://127.0.0.1:1234/v1"),
-        api_key=_read_setting("OPENAI_API_KEY", "dummy"),
+        ollama_base_url=_read_setting("OLLAMA_BASE_URL", "http://127.0.0.1:11434"),
+        ollama_model=_read_setting("OLLAMA_MODEL", "qwen2.5:7b"),
+        ollama_models_dir=_read_setting("OLLAMA_MODELS", "D:/Ollama/Models"),
         whisper_model=_read_setting("WHISPER_MODEL", "base"),
         whisper_language=_read_setting("WHISPER_LANGUAGE", "ru"),
         db_path=_read_setting("DB_PATH", "planner.db"),

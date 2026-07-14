@@ -12,10 +12,12 @@ class Task(BaseModel):
 
     id: int = Field(ge=1)
     title: str = Field(min_length=1)
+    description: str = ""
     priority: Literal["high", "medium", "low"]
     estimated_min: int = Field(ge=1)
     tags: list[str] = Field(default_factory=list)
     deadline: str | None = None
+    scheduled_at: datetime | None = None
     recorded_at: datetime | None = None
     status: Literal["pending", "done"] = "pending"
 
@@ -28,6 +30,11 @@ class Task(BaseModel):
         if not text:
             raise ValueError("title must not be empty")
         return text
+
+    @field_validator("description", mode="before")
+    @classmethod
+    def normalize_description(cls, value: Any) -> str:
+        return str(value or "").strip()
 
     @field_validator("priority", mode="before")
     @classmethod
@@ -86,7 +93,7 @@ class Task(BaseModel):
         text = value.strip()
         return text or None
 
-    @field_validator("recorded_at", mode="before")
+    @field_validator("recorded_at", "scheduled_at", mode="before")
     @classmethod
     def normalize_recorded_at(cls, value: Any) -> datetime | None:
         if value is None or value == "":
@@ -94,14 +101,14 @@ class Task(BaseModel):
         if isinstance(value, datetime):
             return value
         if not isinstance(value, str):
-            raise TypeError("recorded_at must be a datetime string")
+            raise TypeError("datetime value must be a string")
         text = value.strip()
         if not text:
             return None
         try:
             return datetime.fromisoformat(text.replace("Z", "+00:00"))
         except ValueError as exc:
-            raise ValueError("recorded_at must be ISO formatted") from exc
+            raise ValueError("datetime value must be ISO formatted") from exc
 
     @field_validator("status", mode="before")
     @classmethod

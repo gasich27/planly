@@ -1,4 +1,5 @@
 # Backend
+backend/.venv/
 backend/**/__pycache__/
 backend/**/*.pyc
 backend/**/*.pyo
@@ -12,9 +13,6 @@ backend/*.ics
 backend/*.mp3
 backend/*.ogg
 backend/*.log
-
-# Mobile / Flutter UI
-mobile/
 
 # Mobile / Flutter generated files
 mobile/.dart_tool/
