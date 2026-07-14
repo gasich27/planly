@@ -1,10 +1,9 @@
-<<<<<<< HEAD
-# PLANLY (AI Planner)
-=======
 # PLANLY
->>>>>>> 43eaff1 (total update)
 
 AI-first planner with a FastAPI/Ollama backend and Flutter client for Android and iOS.
+
+---
+---
 
 ## Requirements
 
@@ -12,6 +11,9 @@ AI-first planner with a FastAPI/Ollama backend and Flutter client for Android an
 - Flutter 3.22+
 - Ollama
 - An Ollama model stored in `D:/Ollama/Models`
+
+---
+---
 
 ## Ollama
 
@@ -23,6 +25,9 @@ ollama pull qwen2.5:7b
 ```
 
 Ollama must be running while the backend generates or edits plans. LM Studio and OpenAI-compatible endpoints are not used.
+
+---
+---
 
 ## Backend
 
@@ -46,6 +51,9 @@ WHISPER_MODEL=base
 WHISPER_LANGUAGE=ru
 DB_PATH=planner.db
 ```
+
+---
+---
 
 ## Mobile
 
