@@ -74,9 +74,9 @@ def _context_range(context: str, today: date) -> tuple[date, date]:
     return today, today
 
 
-def _build_dashboard(context: str) -> dict[str, object]:
+def _build_dashboard(context: str, selected_date: date | None = None) -> dict[str, object]:
     today = datetime.now().astimezone().date()
-    start, end = _context_range(context, today)
+    start, end = _context_range(context, selected_date or today)
     plans = db.list_plans(limit=500, offset=0)
     tasks: list[dict[str, object]] = []
 
@@ -116,6 +116,34 @@ def _build_dashboard(context: str) -> dict[str, object]:
             int(task.get("id", 0) or 0),
         )
     )
+    estimated_minutes = sum(int(task.get("estimated_min", 0) or 0) for task in tasks)
+    focus_start = "09:00"
+    scheduled_hours: list[int] = []
+    for task in tasks:
+        scheduled_at = task.get("scheduled_at")
+        if isinstance(scheduled_at, str) and "T" in scheduled_at:
+            try:
+                scheduled_hours.append(datetime.fromisoformat(scheduled_at.replace("Z", "+00:00")).hour)
+            except ValueError:
+                pass
+    if scheduled_hours:
+        focus_start = f"{min(scheduled_hours):02d}:00"
+    focus_hour = int(focus_start[:2])
+    focus_end = f"{min(focus_hour + 3, 23):02d}:00"
+    high_priority = sum(
+        1 for task in tasks if str(task.get("priority", "low")).lower() == "high"
+    )
+    break_minutes = 15 if estimated_minutes >= 120 else 10
+    if not tasks:
+        summary = "No plan has been created for this day yet."
+        personal_tip = "Add your first task and PLANLY will build a focused schedule."
+    else:
+        summary = f"{len(tasks)} tasks planned, with {high_priority} high-priority focus items."
+        personal_tip = (
+            "Start with the highest-priority task while your energy is fresh."
+            if high_priority
+            else "Group similar tasks together to keep your momentum."
+        )
     return {
         "context": context.strip().lower() or "today",
         "date": start.isoformat(),
@@ -124,6 +152,12 @@ def _build_dashboard(context: str) -> dict[str, object]:
         "completed": completed,
         "total": total,
         "priority_tasks": pending[:3],
+        "summary": summary,
+        "focus_start": focus_start,
+        "focus_end": focus_end,
+        "main_tasks": min(len(pending), 3),
+        "break_minutes": break_minutes,
+        "personal_tip": personal_tip,
     }
 
 
@@ -320,11 +354,14 @@ async def api_latest_plan() -> JSONResponse:
 
 # curl "http://127.0.0.1:8000/api/dashboard?context=today"
 @app.get("/api/dashboard")
-async def api_dashboard(context: str = "today") -> JSONResponse:
+async def api_dashboard(
+    context: str = "today", date_value: str | None = None
+) -> JSONResponse:
     try:
         if context.strip().lower() not in {"today", "tomorrow", "week", "month"}:
             raise ValueError("context must be today, tomorrow, week or month")
-        dashboard = await asyncio.to_thread(_build_dashboard, context)
+        selected_date = date.fromisoformat(date_value) if date_value else None
+        dashboard = await asyncio.to_thread(_build_dashboard, context, selected_date)
         return JSONResponse(content=dashboard)
     except (ValueError, TypeError) as exc:
         return _json_error("dashboard_error", str(exc), 400)

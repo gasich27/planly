@@ -156,11 +156,15 @@ class ApiService {
     }
   }
 
-  Future<DashboardModel> getDashboard(String context) async {
+  Future<DashboardModel> getDashboard(String context, {DateTime? date}) async {
     try {
+      final query = <String, String>{'context': context};
+      if (date != null) {
+        query['date_value'] = date.toIso8601String().substring(0, 10);
+      }
       final response = await _client
           .get(
-            _uri('/api/dashboard?context=${Uri.encodeQueryComponent(context)}'),
+            _uri('/api/dashboard').replace(queryParameters: query),
             headers: const <String, String>{'Accept': 'application/json'},
           )
           .timeout(ApiConfig.timeout);

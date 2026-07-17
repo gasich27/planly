@@ -941,6 +941,7 @@ class _VoiceCommandBar extends StatelessWidget {
                         fontFamily: AppTypography.family,
                         fontSize: 15,
                         fontWeight: FontWeight.w400,
+                        letterSpacing: -0.72,
                       ),
                       decoration: InputDecoration(
                         hintText: hasAudio
@@ -949,6 +950,8 @@ class _VoiceCommandBar extends StatelessWidget {
                         hintStyle: TextStyle(
                           fontFamily: AppTypography.family,
                           color: Colors.black.withOpacity(0.38),
+                          fontWeight: FontWeight.w400,
+                          letterSpacing: -0.72,
                         ),
                         border: InputBorder.none,
                         isDense: true,

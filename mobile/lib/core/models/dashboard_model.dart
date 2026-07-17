@@ -25,6 +25,12 @@ class DashboardModel {
   final int completed;
   final int total;
   final List<DashboardTaskModel> priorityTasks;
+  final String summary;
+  final String focusStart;
+  final String focusEnd;
+  final int mainTasks;
+  final int breakMinutes;
+  final String personalTip;
 
   const DashboardModel({
     required this.context,
@@ -34,6 +40,12 @@ class DashboardModel {
     required this.completed,
     required this.total,
     required this.priorityTasks,
+    required this.summary,
+    required this.focusStart,
+    required this.focusEnd,
+    required this.mainTasks,
+    required this.breakMinutes,
+    required this.personalTip,
   });
 
   factory DashboardModel.fromJson(Map<String, dynamic> json) {
@@ -51,6 +63,12 @@ class DashboardModel {
               .map(DashboardTaskModel.fromJson)
               .toList()
           : <DashboardTaskModel>[],
+      summary: (json['summary'] ?? '').toString(),
+      focusStart: (json['focus_start'] ?? '09:00').toString(),
+      focusEnd: (json['focus_end'] ?? '12:00').toString(),
+      mainTasks: _asInt(json['main_tasks']),
+      breakMinutes: _asInt(json['break_minutes']),
+      personalTip: (json['personal_tip'] ?? '').toString(),
     );
   }
 }

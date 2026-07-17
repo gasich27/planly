@@ -19,6 +19,8 @@ class PlannerProvider extends ChangeNotifier {
   String? error;
   PlanModel? selectedPlan;
   DashboardModel? dashboard;
+  DashboardModel? goalsDashboard;
+  bool isGoalsLoading = false;
   List<StoryBranchModel> storyBranches = <StoryBranchModel>[];
   String dashboardContext = 'today';
   Timer? _refreshTimer;
@@ -169,6 +171,22 @@ class PlannerProvider extends ChangeNotifier {
       rethrow;
     } finally {
       isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> loadGoalsDashboard(DateTime date) async {
+    isGoalsLoading = true;
+    error = null;
+    notifyListeners();
+    try {
+      goalsDashboard = await _apiService.getDashboard('today', date: date);
+    } on ApiException catch (e) {
+      error = e.message;
+    } catch (e) {
+      error = e.toString();
+    } finally {
+      isGoalsLoading = false;
       notifyListeners();
     }
   }
