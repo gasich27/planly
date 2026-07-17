@@ -4,6 +4,7 @@ class StoryBranchModel {
   final DateTime startDate;
   final DateTime endDate;
   final String grouping;
+  final String description;
 
   const StoryBranchModel({
     required this.id,
@@ -11,6 +12,7 @@ class StoryBranchModel {
     required this.startDate,
     required this.endDate,
     required this.grouping,
+    this.description = '',
   });
 
   factory StoryBranchModel.fromJson(Map<String, dynamic> json) {
@@ -22,6 +24,7 @@ class StoryBranchModel {
           DateTime.tryParse((json['start_date'] ?? '').toString()) ?? now,
       endDate: DateTime.tryParse((json['end_date'] ?? '').toString()) ?? now,
       grouping: (json['grouping'] ?? 'day').toString(),
+      description: (json['description'] ?? '').toString(),
     );
   }
 
@@ -31,6 +34,7 @@ class StoryBranchModel {
         'start_date': startDate.toIso8601String(),
         'end_date': endDate.toIso8601String(),
         'grouping': grouping,
+        'description': description,
       };
 
   StoryBranchModel copyWith({
@@ -38,6 +42,7 @@ class StoryBranchModel {
     DateTime? startDate,
     DateTime? endDate,
     String? grouping,
+    String? description,
   }) {
     return StoryBranchModel(
       id: id,
@@ -45,6 +50,7 @@ class StoryBranchModel {
       startDate: startDate ?? this.startDate,
       endDate: endDate ?? this.endDate,
       grouping: grouping ?? this.grouping,
+      description: description ?? this.description,
     );
   }
 }

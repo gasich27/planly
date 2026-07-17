@@ -1,9 +1,13 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:record/record.dart';
 
 import '../core/models/plan_model.dart';
 import '../core/models/story_branch_model.dart';
@@ -133,10 +137,9 @@ class _PlanningStoriesStripState extends State<PlanningStoriesStrip> {
     return LayoutBuilder(
       builder: (context, constraints) {
         const sidePadding = 28.0;
-        const baseItemsWidth = 310.0;
         final available = constraints.maxWidth - sidePadding * 2;
-        final spacing =
-            ((available - baseItemsWidth) / 5).clamp(5.0, 14.0).toDouble();
+        final storySlotWidth = available / 6;
+        final spacing = (storySlotWidth - 56).clamp(6.0, 14.0).toDouble();
         return SizedBox(
           height: 98,
           child: ListView(
@@ -148,27 +151,13 @@ class _PlanningStoriesStripState extends State<PlanningStoriesStrip> {
               SizedBox(
                 key: const Key('base_stories_group'),
                 width: available,
-                child: available >= baseItemsWidth
-                    ? _BaseStoriesGroup(
-                        branches: baseBranches,
-                        onAddPlan: widget.onAddPlan,
-                        onEditPlan: widget.onEditPlan,
-                        onCreateBranch: widget.onCreateBranch,
-                        onOpenBranch: widget.onOpenBranch,
-                      )
-                    : FittedBox(
-                        fit: BoxFit.scaleDown,
-                        child: SizedBox(
-                          width: baseItemsWidth,
-                          child: _BaseStoriesGroup(
-                            branches: baseBranches,
-                            onAddPlan: widget.onAddPlan,
-                            onEditPlan: widget.onEditPlan,
-                            onCreateBranch: widget.onCreateBranch,
-                            onOpenBranch: widget.onOpenBranch,
-                          ),
-                        ),
-                      ),
+                child: _BaseStoriesGroup(
+                  branches: baseBranches,
+                  onAddPlan: widget.onAddPlan,
+                  onEditPlan: widget.onEditPlan,
+                  onCreateBranch: widget.onCreateBranch,
+                  onOpenBranch: widget.onOpenBranch,
+                ),
               ),
               for (var index = 0; index < customBranches.length; index++) ...[
                 SizedBox(width: spacing),
@@ -204,27 +193,40 @@ class _BaseStoriesGroup extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _PlanActionStory(
-          label: 'add plan',
-          palette: const [Color(0xFFF2F2F2), Color(0xFFF1D58D)],
-          pillColor: const Color(0xFFFFF5E5),
-          onTap: onAddPlan,
+        Expanded(
+          child: Center(
+            child: _PlanActionStory(
+              label: 'add plan',
+              palette: const [Color(0xFFF2F2F2), Color(0xFFF1D58D)],
+              pillColor: const Color(0xFFFFF5E5),
+              onTap: onAddPlan,
+            ),
+          ),
         ),
-        _PlanActionStory(
-          label: 'edit plan',
-          palette: const [Color(0xFFF4F4F4), Color(0xFFFFB5A6)],
-          pillColor: const Color(0xFFFFE8E7),
-          onTap: onEditPlan,
+        Expanded(
+          child: Center(
+            child: _PlanActionStory(
+              label: 'edit plan',
+              palette: const [Color(0xFFF4F4F4), Color(0xFFFFB5A6)],
+              pillColor: const Color(0xFFFFE8E7),
+              onTap: onEditPlan,
+            ),
+          ),
         ),
-        _NewBranchButton(onTap: onCreateBranch),
+        Expanded(
+          child: Center(child: _NewBranchButton(onTap: onCreateBranch)),
+        ),
         for (var index = 0; index < branches.length; index++)
-          _BranchStory(
-            branch: branches[index],
-            visualIndex: index,
-            onTap: () => onOpenBranch(branches[index]),
+          Expanded(
+            child: Center(
+              child: _BranchStory(
+                branch: branches[index],
+                visualIndex: index,
+                onTap: () => onOpenBranch(branches[index]),
+              ),
+            ),
           ),
       ],
     );
@@ -447,92 +449,473 @@ class PlanCommandResult {
   final String command;
   final String period;
   final DateTimeRange dateRange;
+  final String branchId;
+  final String branchTitle;
+  final String grouping;
+  final String placement;
 
   const PlanCommandResult({
     required this.command,
     required this.period,
     required this.dateRange,
+    required this.branchId,
+    required this.branchTitle,
+    required this.grouping,
+    required this.placement,
   });
 }
 
 Future<PlanCommandResult?> showPlanCommandEditor(
   BuildContext context, {
   required bool isEdit,
+  required List<PlanningStoryBranch> branches,
+  PlanningStoryBranch? selectedBranch,
+  required Future<String> Function(File audio) transcribeAudio,
 }) async {
-  final controller = TextEditingController();
-  var period = 'day';
-  var range = DateTimeRange(start: DateTime.now(), end: DateTime.now());
-  final result = await showModalBottomSheet<PlanCommandResult>(
+  return showModalBottomSheet<PlanCommandResult>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
     backgroundColor: Colors.transparent,
-    builder: (context) => StatefulBuilder(
-      builder: (context, setModalState) {
-        Future<void> selectRange() async {
-          final selected = await showDateRangePicker(
-            context: context,
-            firstDate: DateTime.now().subtract(const Duration(days: 365)),
-            lastDate: DateTime.now().add(const Duration(days: 3650)),
-            initialDateRange: range,
-          );
-          if (selected != null) {
-            setModalState(() => range = selected);
-          }
-        }
-
-        return _PlanlyEditorSurface(
-          commandController: controller,
-          commandHint:
-              isEdit ? 'What should be changed?' : 'Add, edit, execute . . .',
-          children: [
-            DropdownButtonFormField<String>(
-              initialValue: period,
-              decoration: _gradientFieldDecoration('Planning period'),
-              borderRadius: BorderRadius.circular(26),
-              items: const [
-                DropdownMenuItem(value: 'day', child: Text('Today')),
-                DropdownMenuItem(value: 'tomorrow', child: Text('Tomorrow')),
-                DropdownMenuItem(value: 'week', child: Text('Week')),
-                DropdownMenuItem(value: 'month', child: Text('Month')),
-                DropdownMenuItem(value: 'custom', child: Text('Custom range')),
-              ],
-              onChanged: (value) {
-                if (value != null) {
-                  setModalState(() => period = value);
-                }
-              },
-            ),
-            const SizedBox(height: 13),
-            _GradientDateField(
-              range: range,
-              label: 'Date range',
-              onTap: selectRange,
-            ),
-            const SizedBox(height: 13),
-            _GradientActionButton(
-              label: isEdit ? 'Edit plan' : 'Add plan',
-              onTap: () {
-                final command = controller.text.trim();
-                if (command.isEmpty) {
-                  return;
-                }
-                Navigator.pop(
-                  context,
-                  PlanCommandResult(
-                    command: command,
-                    period: period,
-                    dateRange: range,
-                  ),
-                );
-              },
-            ),
-          ],
-        );
-      },
+    barrierColor: const Color(0xFFFFB978).withOpacity(0.34),
+    builder: (context) => _EditorSheetBackdrop(
+      child: _PlanCommandSheet(
+        isEdit: isEdit,
+        branches: branches,
+        selectedBranch: selectedBranch,
+        transcribeAudio: transcribeAudio,
+      ),
     ),
   );
-  return result;
+}
+
+class _PlanCommandSheet extends StatefulWidget {
+  final bool isEdit;
+  final List<PlanningStoryBranch> branches;
+  final PlanningStoryBranch? selectedBranch;
+  final Future<String> Function(File audio) transcribeAudio;
+
+  const _PlanCommandSheet({
+    required this.isEdit,
+    required this.branches,
+    required this.selectedBranch,
+    required this.transcribeAudio,
+  });
+
+  @override
+  State<_PlanCommandSheet> createState() => _PlanCommandSheetState();
+}
+
+class _PlanCommandSheetState extends State<_PlanCommandSheet> {
+  final _commandController = TextEditingController();
+  final _nameController = TextEditingController();
+  final _recorder = AudioRecorder();
+  late PlanningStoryBranch _branch;
+  late DateTimeRange _range;
+  late String _grouping;
+  String _placement = 'inside';
+  bool _recording = false;
+  bool _transcribing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _branch = widget.selectedBranch ?? widget.branches.first;
+    _range = DateTimeRange(start: _branch.startDate, end: _branch.endDate);
+    _grouping = _branch.grouping;
+    _nameController.text = _branch.title;
+  }
+
+  @override
+  void dispose() {
+    _commandController.dispose();
+    _nameController.dispose();
+    unawaited(_recorder.dispose());
+    super.dispose();
+  }
+
+  Future<void> _toggleRecording() async {
+    if (_recording) {
+      final path = await _recorder.stop();
+      if (!mounted) return;
+      setState(() {
+        _recording = false;
+        _transcribing = path != null;
+      });
+      if (path == null) return;
+      try {
+        final transcript = await widget.transcribeAudio(File(path));
+        if (mounted) _commandController.text = transcript;
+      } catch (error) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(error.toString())),
+          );
+        }
+      } finally {
+        if (mounted) setState(() => _transcribing = false);
+      }
+      return;
+    }
+    if (kIsWeb) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Voice input is available on iOS and Android.')),
+      );
+      return;
+    }
+    if (!await _recorder.hasPermission()) return;
+    final directory = await getTemporaryDirectory();
+    final path = '${directory.path}/planly_editor_${DateTime.now().millisecondsSinceEpoch}.m4a';
+    await _recorder.start(const RecordConfig(encoder: AudioEncoder.aacLc), path: path);
+    if (mounted) setState(() => _recording = true);
+  }
+
+  Future<void> _selectRange() async {
+    final selected = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime.now().subtract(const Duration(days: 730)),
+      lastDate: DateTime.now().add(const Duration(days: 3650)),
+      initialDateRange: _range,
+    );
+    if (selected != null && mounted) setState(() => _range = selected);
+  }
+
+  void _submit() {
+    final command = _commandController.text.trim();
+    if (command.isEmpty || _transcribing) return;
+    Navigator.pop(
+      context,
+      PlanCommandResult(
+        command: command,
+        period: _periodFor(_grouping),
+        dateRange: _range,
+        branchId: _branch.id,
+        branchTitle: _nameController.text.trim().isEmpty
+            ? _branch.title
+            : _nameController.text.trim(),
+        grouping: _grouping,
+        placement: _placement,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final height = MediaQuery.sizeOf(context).height;
+    return Align(
+      alignment: Alignment.bottomCenter,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: height * 0.93),
+        child: SingleChildScrollView(
+          padding: EdgeInsets.fromLTRB(
+            28,
+            12,
+            28,
+            20 + MediaQuery.viewInsetsOf(context).bottom,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _sheetHandle(),
+              const SizedBox(height: 14),
+              _EditorGlassPanel(
+                radius: 38,
+                child: SizedBox(
+                  height: (height * 0.24).clamp(180.0, 235.0),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _EditorMicButton(
+                        recording: _recording,
+                        loading: _transcribing,
+                        onTap: _toggleRecording,
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: TextField(
+                          key: const Key('plan_command_input'),
+                          controller: _commandController,
+                          autofocus: true,
+                          expands: true,
+                          maxLines: null,
+                          textAlignVertical: TextAlignVertical.top,
+                          style: _editorTextStyle(17),
+                          decoration: InputDecoration(
+                            isCollapsed: true,
+                            contentPadding: const EdgeInsets.only(top: 18),
+                            border: InputBorder.none,
+                            hintText: widget.isEdit
+                                ? 'Describe what should be changed . . .'
+                                : 'Add the story outline to the thread . . .',
+                            hintStyle: _editorTextStyle(17, opacity: 0.40),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              _EditorGlassPanel(
+                radius: 38,
+                padding: const EdgeInsets.all(10),
+                child: Column(
+                  children: [
+                    DropdownButtonFormField<String>(
+                      key: const Key('plan_branch_selector'),
+                      initialValue: _branch.id,
+                      decoration: _glassFieldDecoration('Name'),
+                      borderRadius: BorderRadius.circular(14),
+                      style: _editorTextStyle(15),
+                      items: widget.branches
+                          .map((branch) => DropdownMenuItem(
+                                value: branch.id,
+                                child: Text(branch.title),
+                              ))
+                          .toList(),
+                      onChanged: (id) {
+                        if (id == null) return;
+                        final branch = widget.branches.firstWhere((item) => item.id == id);
+                        setState(() {
+                          _branch = branch;
+                          _nameController.text = branch.title;
+                          _range = DateTimeRange(start: branch.startDate, end: branch.endDate);
+                          _grouping = branch.grouping;
+                        });
+                      },
+                    ),
+                    if (widget.isEdit) ...[
+                      const SizedBox(height: 10),
+                      TextField(
+                        controller: _nameController,
+                        style: _editorTextStyle(15),
+                        decoration: _glassFieldDecoration('Rename branch'),
+                      ),
+                    ],
+                    const SizedBox(height: 10),
+                    DropdownButtonFormField<String>(
+                      key: const Key('plan_grouping_selector'),
+                      initialValue: _grouping,
+                      decoration: _glassFieldDecoration('Planning period'),
+                      borderRadius: BorderRadius.circular(14),
+                      style: _editorTextStyle(15),
+                      items: const [
+                        DropdownMenuItem(value: 'hour', child: Text('By hours')),
+                        DropdownMenuItem(value: 'day', child: Text('By days')),
+                        DropdownMenuItem(value: 'week', child: Text('By weeks')),
+                      ],
+                      onChanged: (value) {
+                        if (value != null) setState(() => _grouping = value);
+                      },
+                    ),
+                    const SizedBox(height: 10),
+                    _GradientDateField(
+                      range: _range,
+                      label: 'Date range',
+                      onTap: _selectRange,
+                    ),
+                    const SizedBox(height: 10),
+                    DropdownButtonFormField<String>(
+                      initialValue: _placement,
+                      decoration: _glassFieldDecoration(widget.isEdit ? 'Replace where' : 'Add where'),
+                      borderRadius: BorderRadius.circular(14),
+                      style: _editorTextStyle(15),
+                      items: const [
+                        DropdownMenuItem(value: 'before', child: Text('Before selected dates')),
+                        DropdownMenuItem(value: 'inside', child: Text('Inside selected dates')),
+                        DropdownMenuItem(value: 'after', child: Text('After selected dates')),
+                      ],
+                      onChanged: (value) {
+                        if (value != null) setState(() => _placement = value);
+                      },
+                    ),
+                    const SizedBox(height: 10),
+                    _GradientActionButton(
+                      label: widget.isEdit ? 'Edit plan' : 'Add plan',
+                      onTap: _submit,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+String _periodFor(String grouping) => switch (grouping) {
+      'hour' => 'day',
+      'week' => 'month',
+      _ => 'week',
+    };
+
+Widget _sheetHandle() => Container(
+      width: 42,
+      height: 4,
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.18),
+        borderRadius: BorderRadius.circular(99),
+      ),
+    );
+
+TextStyle _editorTextStyle(double size, {double opacity = 1}) => TextStyle(
+      fontFamily: AppTypography.family,
+      fontSize: size,
+      fontWeight: FontWeight.w300,
+      color: Colors.black.withOpacity(opacity),
+      letterSpacing: -size * 0.04,
+    );
+
+class _EditorMicButton extends StatelessWidget {
+  final bool recording;
+  final bool loading;
+  final VoidCallback onTap;
+
+  const _EditorMicButton({required this.recording, required this.loading, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: loading ? null : onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 420),
+        width: 52,
+        height: 52,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: const RadialGradient(colors: [Color(0xFFFF6D36), Color(0xFFFFA000)]),
+          boxShadow: recording
+              ? [BoxShadow(color: _storyOrange.withOpacity(0.42), blurRadius: 22, spreadRadius: 5)]
+              : null,
+        ),
+        child: loading
+            ? const Padding(padding: EdgeInsets.all(16), child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black38))
+            : Icon(recording ? Icons.stop_rounded : Icons.mic_rounded, color: Colors.black.withOpacity(0.36)),
+      ),
+    );
+  }
+}
+
+class _EditorGlassPanel extends StatelessWidget {
+  final Widget child;
+  final double radius;
+  final EdgeInsetsGeometry padding;
+
+  const _EditorGlassPanel({required this.child, required this.radius, this.padding = const EdgeInsets.all(18)});
+
+  @override
+  Widget build(BuildContext context) {
+    final borderRadius = BorderRadius.circular(radius);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: borderRadius,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.07),
+            blurRadius: 22,
+            spreadRadius: -8,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: borderRadius,
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 42, sigmaY: 48),
+          child: Stack(
+            fit: StackFit.passthrough,
+            children: [
+              Positioned.fill(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    borderRadius: borderRadius,
+                    gradient: LinearGradient(
+                      begin: const Alignment(-0.9, -1),
+                      end: const Alignment(0.9, 1),
+                      stops: const [0, 0.34, 0.72, 1],
+                      colors: [
+                        const Color(0xFFFFE7C4).withOpacity(0.38),
+                        const Color(0xFFFFDBAA).withOpacity(0.18),
+                        const Color(0xFFFFC978).withOpacity(0.12),
+                        const Color(0xFFFFE7C4).withOpacity(0.28),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: CustomPaint(
+                    painter: _EditorGlassEdgePainter(radius: radius),
+                  ),
+                ),
+              ),
+              Padding(padding: padding, child: child),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _EditorSheetBackdrop extends StatelessWidget {
+  final Widget child;
+
+  const _EditorSheetBackdrop({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Positioned.fill(
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+            child: const SizedBox.expand(),
+          ),
+        ),
+        child,
+      ],
+    );
+  }
+}
+
+class _EditorGlassEdgePainter extends CustomPainter {
+  final double radius;
+
+  const _EditorGlassEdgePainter({required this.radius});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Offset.zero & size;
+    final edge = RRect.fromRectAndRadius(
+      rect.deflate(0.7),
+      Radius.circular(math.max(0, radius - 0.7)),
+    );
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 0.9
+      ..shader = const LinearGradient(
+        begin: Alignment(-0.9, -1),
+        end: Alignment(0.95, 1),
+        stops: [0, 0.28, 0.62, 1],
+        colors: [
+          Color(0xA8FFE7C4),
+          Color(0x50FFDBAA),
+          Color(0x22FFC978),
+          Color(0x82FFE7C4),
+        ],
+      ).createShader(rect);
+    canvas.drawRRect(edge, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _EditorGlassEdgePainter oldDelegate) {
+    return oldDelegate.radius != radius;
+  }
 }
 
 class _PlanlyEditorSurface extends StatelessWidget {
@@ -548,46 +931,29 @@ class _PlanlyEditorSurface extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        Image.asset('assets/backgrounds/image2.png', fit: BoxFit.cover),
-        SingleChildScrollView(
+    final height = MediaQuery.sizeOf(context).height;
+    return Align(
+      alignment: Alignment.bottomCenter,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: height * 0.92),
+        child: SingleChildScrollView(
           padding: EdgeInsets.fromLTRB(
             28,
-            22,
+            12,
             28,
-            28 + MediaQuery.viewInsetsOf(context).bottom,
+            20 + MediaQuery.viewInsetsOf(context).bottom,
           ),
           child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Row(
-                children: [
-                  IconButton(
-                    onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.close_rounded),
-                  ),
-                  const Spacer(),
-                ],
-              ),
-              Container(
-                height: 235,
+              _sheetHandle(),
+              const SizedBox(height: 14),
+              _EditorGlassPanel(
+                radius: 38,
                 padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      const Color(0xFFFFBD45).withOpacity(0.84),
-                      const Color(0xFFFF8800).withOpacity(0.82),
-                      Colors.white.withOpacity(0.48),
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(38),
-                  border: Border.all(
-                      color: Colors.white.withOpacity(0.86), width: 1.2),
-                ),
-                child: Row(
+                child: SizedBox(
+                  height: (height * 0.24).clamp(180.0, 235.0),
+                  child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Container(
@@ -610,18 +976,12 @@ class _PlanlyEditorSurface extends StatelessWidget {
                         maxLines: null,
                         expands: true,
                         textAlignVertical: TextAlignVertical.top,
-                        style: const TextStyle(
-                          fontFamily: AppTypography.family,
-                          fontSize: 17,
-                          fontWeight: FontWeight.w400,
-                        ),
+                        style: _editorTextStyle(17),
                         decoration: InputDecoration(
+                          isCollapsed: true,
+                          contentPadding: const EdgeInsets.only(top: 18),
                           hintText: commandHint,
-                          hintStyle: TextStyle(
-                            fontFamily: AppTypography.family,
-                            color: Colors.black.withOpacity(0.42),
-                            fontWeight: FontWeight.w400,
-                          ),
+                          hintStyle: _editorTextStyle(17, opacity: 0.42),
                           border: InputBorder.none,
                         ),
                       ),
@@ -629,29 +989,17 @@ class _PlanlyEditorSurface extends StatelessWidget {
                   ],
                 ),
               ),
+              ),
               const SizedBox(height: 16),
-              Container(
+              _EditorGlassPanel(
+                radius: 38,
                 padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      const Color(0xFFFFD500).withOpacity(0.66),
-                      const Color(0xFFFFA000).withOpacity(0.54),
-                      Colors.white.withOpacity(0.58),
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(38),
-                  border: Border.all(
-                      color: Colors.white.withOpacity(0.86), width: 1.2),
-                ),
                 child: Column(children: children),
               ),
             ],
           ),
         ),
-      ],
+      ),
     );
   }
 }
@@ -681,21 +1029,12 @@ class _GradientDateField extends StatelessWidget {
             Expanded(
               child: Text(
                 '${DateFormat('dd.MM.yyyy').format(range.start)} - ${DateFormat('dd.MM.yyyy').format(range.end)}',
-                style: const TextStyle(
-                  fontFamily: AppTypography.family,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w400,
-                ),
+                style: _editorTextStyle(15),
               ),
             ),
             Text(
               label,
-              style: TextStyle(
-                fontFamily: AppTypography.family,
-                fontSize: 14,
-                fontWeight: FontWeight.w400,
-                color: Colors.black.withOpacity(0.62),
-              ),
+              style: _editorTextStyle(14, opacity: 0.62),
             ),
           ],
         ),
@@ -721,11 +1060,7 @@ class _GradientActionButton extends StatelessWidget {
         decoration: _gradientFieldDecorationBox(),
         child: Text(
           label,
-          style: const TextStyle(
-            fontFamily: AppTypography.family,
-            fontSize: 24,
-            fontWeight: FontWeight.w500,
-          ),
+          style: _editorTextStyle(24).copyWith(fontWeight: FontWeight.w300),
         ),
       ),
     );
@@ -733,18 +1068,36 @@ class _GradientActionButton extends StatelessWidget {
 }
 
 InputDecoration _gradientFieldDecoration(String label) {
+  return _glassFieldDecoration(label);
+}
+
+InputDecoration _glassFieldDecoration(String label) {
   return InputDecoration(
     labelText: label,
     filled: true,
-    fillColor: Colors.white.withOpacity(0.42),
+    fillColor: const Color(0xFFFFE7C4).withOpacity(0.22),
+    labelStyle: _editorTextStyle(15, opacity: 0.62),
     contentPadding: const EdgeInsets.symmetric(horizontal: 26, vertical: 22),
     border: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(28),
-      borderSide: BorderSide(color: Colors.white.withOpacity(0.84)),
+      borderRadius: BorderRadius.circular(999),
+      borderSide: BorderSide(
+        color: const Color(0xFFFFE7C4).withOpacity(0.58),
+        width: 0.8,
+      ),
     ),
     enabledBorder: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(28),
-      borderSide: BorderSide(color: Colors.white.withOpacity(0.84)),
+      borderRadius: BorderRadius.circular(999),
+      borderSide: BorderSide(
+        color: const Color(0xFFFFE7C4).withOpacity(0.58),
+        width: 0.8,
+      ),
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(999),
+      borderSide: BorderSide(
+        color: const Color(0xFFFFE7C4).withOpacity(0.82),
+        width: 0.9,
+      ),
     ),
   );
 }
@@ -752,14 +1105,29 @@ InputDecoration _gradientFieldDecoration(String label) {
 BoxDecoration _gradientFieldDecorationBox() {
   return BoxDecoration(
     gradient: LinearGradient(
+      begin: const Alignment(-0.9, -1),
+      end: const Alignment(0.9, 1),
+      stops: const [0, 0.34, 0.72, 1],
       colors: [
-        const Color(0xFFFFD900).withOpacity(0.56),
-        const Color(0xFFFFBD5A).withOpacity(0.50),
-        Colors.white.withOpacity(0.66),
+        const Color(0xFFFFE7C4).withOpacity(0.30),
+        const Color(0xFFFFDBAA).withOpacity(0.13),
+        const Color(0xFFFFC978).withOpacity(0.10),
+        const Color(0xFFFFE7C4).withOpacity(0.20),
       ],
     ),
-    borderRadius: BorderRadius.circular(28),
-    border: Border.all(color: Colors.white.withOpacity(0.84)),
+    borderRadius: BorderRadius.circular(999),
+    border: Border.all(
+      color: const Color(0xFFFFE7C4).withOpacity(0.58),
+      width: 0.8,
+    ),
+    boxShadow: [
+      BoxShadow(
+        color: Colors.black.withOpacity(0.045),
+        blurRadius: 16,
+        spreadRadius: -8,
+        offset: const Offset(0, 8),
+      ),
+    ],
   );
 }
 
@@ -767,7 +1135,8 @@ Future<StoryBranchModel?> showPlanlyStoryBranchEditor(
   BuildContext context, {
   StoryBranchModel? initial,
 }) async {
-  final commandController = TextEditingController();
+  final commandController =
+      TextEditingController(text: initial?.description ?? '');
   final titleController = TextEditingController(text: initial?.title ?? '');
   var start = initial?.startDate ?? DateTime.now();
   var end = initial?.endDate ?? DateTime.now().add(const Duration(days: 2));
@@ -777,6 +1146,7 @@ Future<StoryBranchModel?> showPlanlyStoryBranchEditor(
     isScrollControlled: true,
     useSafeArea: true,
     backgroundColor: Colors.transparent,
+    barrierColor: const Color(0xFFFFB978).withOpacity(0.34),
     builder: (context) => StatefulBuilder(
       builder: (context, setModalState) {
         Future<void> selectRange() async {
@@ -794,16 +1164,14 @@ Future<StoryBranchModel?> showPlanlyStoryBranchEditor(
           }
         }
 
-        return _PlanlyEditorSurface(
-          commandController: commandController,
-          commandHint: 'Describe your new story branch . . .',
-          children: [
+        return _EditorSheetBackdrop(
+          child: _PlanlyEditorSurface(
+            commandController: commandController,
+            commandHint: 'Describe your new story branch . . .',
+            children: [
             TextField(
               controller: titleController,
-              style: const TextStyle(
-                fontFamily: AppTypography.family,
-                fontWeight: FontWeight.w400,
-              ),
+              style: _editorTextStyle(15),
               decoration: _gradientFieldDecoration('Name, for example Berlin'),
             ),
             const SizedBox(height: 13),
@@ -816,7 +1184,8 @@ Future<StoryBranchModel?> showPlanlyStoryBranchEditor(
             DropdownButtonFormField<String>(
               initialValue: grouping,
               decoration: _gradientFieldDecoration('Split stories by'),
-              borderRadius: BorderRadius.circular(26),
+              borderRadius: BorderRadius.circular(14),
+              style: _editorTextStyle(15),
               items: const [
                 DropdownMenuItem(value: 'hour', child: Text('Hours')),
                 DropdownMenuItem(value: 'day', child: Text('Days')),
@@ -845,11 +1214,13 @@ Future<StoryBranchModel?> showPlanlyStoryBranchEditor(
                     startDate: start,
                     endDate: end,
                     grouping: grouping,
+                    description: commandController.text.trim(),
                   ),
                 );
               },
             ),
-          ],
+            ],
+          ),
         );
       },
     ),

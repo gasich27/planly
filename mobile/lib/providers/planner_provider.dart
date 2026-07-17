@@ -173,6 +173,21 @@ class PlannerProvider extends ChangeNotifier {
     }
   }
 
+  Future<String> transcribeAudio(File audio) async {
+    error = null;
+    try {
+      return await _apiService.transcribeAudio(audio);
+    } on ApiException catch (e) {
+      error = e.message;
+      notifyListeners();
+      rethrow;
+    } catch (e) {
+      error = e.toString();
+      notifyListeners();
+      rethrow;
+    }
+  }
+
   Future<List<PlanModel>> _loadSeedPlans() async {
     try {
       final raw = await rootBundle.loadString('assets/data/plan_seed.json');

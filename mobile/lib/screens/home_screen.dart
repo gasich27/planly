@@ -60,15 +60,29 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Future<void> _openPlanCommandEditor({required bool isEdit}) async {
-    final result = await showPlanCommandEditor(context, isEdit: isEdit);
+    final provider = context.read<PlannerProvider>();
+    final branches = <PlanningStoryBranch>[
+      ...PlanningStoryBranch.defaults(DateTime.now()),
+      ...provider.storyBranches.map(PlanningStoryBranch.custom),
+    ];
+    final result = await showPlanCommandEditor(
+      context,
+      isEdit: isEdit,
+      branches: branches,
+      selectedBranch: _selectedStoryBranch,
+      transcribeAudio: provider.transcribeAudio,
+    );
     if (result == null || !mounted) {
       return;
     }
-    final provider = context.read<PlannerProvider>();
     final rangeText =
         '${DateFormat('yyyy-MM-dd').format(result.dateRange.start)} to '
         '${DateFormat('yyyy-MM-dd').format(result.dateRange.end)}';
-    final command = '${result.command}\nDate range: $rangeText';
+    final command = '''${result.command}
+Story branch: ${result.branchTitle} (${result.branchId})
+Date range: $rangeText
+Story grouping: ${result.grouping}
+Placement: ${result.placement} the selected date range.''';
     if (isEdit && provider.plans.isNotEmpty) {
       await provider.aiEditPlan(provider.plans.first.id, command);
     } else {
