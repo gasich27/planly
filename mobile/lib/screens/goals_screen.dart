@@ -212,15 +212,10 @@ class _GoalsScreenState extends State<GoalsScreen>
                         padding: EdgeInsets.fromLTRB(side, 18, side, 128),
                         sliver: SliverList.list(
                           children: [
-                            AnimatedSwitcher(
-                              duration: const Duration(milliseconds: 420),
-                              switchInCurve: Curves.easeOutCubic,
-                              child: _RecommendationsCard(
-                                key: ValueKey(_selectedDate),
-                                dashboard: provider.goalsDashboard,
-                                loading: provider.isGoalsLoading,
-                                onViewPlan: () => _openFullPlan(provider),
-                              ),
+                            _RecommendationsCard(
+                              dashboard: provider.goalsDashboard,
+                              loading: provider.isGoalsLoading,
+                              onViewPlan: () => _openFullPlan(provider),
                             ),
                             const SizedBox(height: 12),
                             _CalendarCard(
@@ -741,11 +736,10 @@ class _VoiceCommandCard extends StatelessWidget {
                     const SizedBox(width: 17),
                     Expanded(
                       child: Transform.translate(
-                        offset: const Offset(0, 2),
+                        offset: const Offset(0, 3),
                         child: TextField(
                           controller: controller,
                           style: _GoalsText.input,
-                          textAlignVertical: TextAlignVertical.center,
                           decoration: const InputDecoration(
                             hintText: 'Add, edit, execute . . .',
                             hintStyle: _GoalsText.hint,
@@ -962,10 +956,10 @@ class _GlassPanel extends StatelessWidget {
                       end: const Alignment(0.9, 1),
                       stops: const [0, 0.34, 0.72, 1],
                       colors: [
-                        Colors.white.withOpacity(0.28),
-                        Colors.white.withOpacity(0.10),
-                        const Color(0xFFFFB04A).withOpacity(0.07),
-                        Colors.white.withOpacity(0.17),
+                        Colors.white.withOpacity(0.19),
+                        Colors.white.withOpacity(0.055),
+                        const Color(0xFFFFB04A).withOpacity(0.035),
+                        Colors.white.withOpacity(0.105),
                       ],
                     ),
                   ),

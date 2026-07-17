@@ -200,7 +200,6 @@ class _BaseStoriesGroup extends StatelessWidget {
             child: _PlanActionStory(
               label: 'add plan',
               palette: const [Color(0xFFF2F2F2), Color(0xFFF1D58D)],
-              pillColor: const Color(0xFFFFF5E5),
               onTap: onAddPlan,
             ),
           ),
@@ -210,7 +209,6 @@ class _BaseStoriesGroup extends StatelessWidget {
             child: _PlanActionStory(
               label: 'edit plan',
               palette: const [Color(0xFFF4F4F4), Color(0xFFFFB5A6)],
-              pillColor: const Color(0xFFFFE8E7),
               onTap: onEditPlan,
             ),
           ),
@@ -236,13 +234,11 @@ class _BaseStoriesGroup extends StatelessWidget {
 class _PlanActionStory extends StatelessWidget {
   final String label;
   final List<Color> palette;
-  final Color pillColor;
   final VoidCallback onTap;
 
   const _PlanActionStory({
     required this.label,
     required this.palette,
-    required this.pillColor,
     required this.onTap,
   });
 
@@ -278,23 +274,25 @@ class _PlanActionStory extends StatelessWidget {
             ),
             Positioned(
               top: 49,
-              child: Container(
-                height: 25,
+              child: ConstrainedBox(
                 constraints: const BoxConstraints(minWidth: 58),
-                padding: const EdgeInsets.symmetric(horizontal: 7),
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: pillColor.withOpacity(0.88),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  style: const TextStyle(
-                    fontFamily: AppTypography.family,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w400,
-                    letterSpacing: -0.45,
+                child: _EditorGlassPanel(
+                  radius: 999,
+                  padding: const EdgeInsets.symmetric(horizontal: 7),
+                  child: SizedBox(
+                    height: 25,
+                    child: Center(
+                      child: Text(
+                        label,
+                        maxLines: 1,
+                        style: const TextStyle(
+                          fontFamily: AppTypography.family,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w400,
+                          letterSpacing: -0.45,
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -813,10 +811,22 @@ class _EditorGlassPanel extends StatelessWidget {
         borderRadius: borderRadius,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.07),
-            blurRadius: 22,
+            color: Colors.black.withOpacity(0.055),
+            blurRadius: 18,
             spreadRadius: -8,
             offset: const Offset(0, 10),
+          ),
+          BoxShadow(
+            color: const Color(0xFFFF8A00).withOpacity(0.13),
+            blurRadius: 30,
+            spreadRadius: -10,
+            offset: const Offset(0, 14),
+          ),
+          BoxShadow(
+            color: Colors.white.withOpacity(0.55),
+            blurRadius: 12,
+            spreadRadius: -5,
+            offset: const Offset(-2, -4),
           ),
         ],
       ),
@@ -836,10 +846,10 @@ class _EditorGlassPanel extends StatelessWidget {
                       end: const Alignment(0.9, 1),
                       stops: const [0, 0.34, 0.72, 1],
                       colors: [
-                        const Color(0xFFFFE7C4).withOpacity(0.38),
-                        const Color(0xFFFFDBAA).withOpacity(0.18),
-                        const Color(0xFFFFC978).withOpacity(0.12),
-                        const Color(0xFFFFE7C4).withOpacity(0.28),
+                        Colors.white.withOpacity(0.19),
+                        Colors.white.withOpacity(0.055),
+                        const Color(0xFFFFB04A).withOpacity(0.035),
+                        Colors.white.withOpacity(0.105),
                       ],
                     ),
                   ),
@@ -897,16 +907,16 @@ class _EditorGlassEdgePainter extends CustomPainter {
     );
     final paint = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 0.9
+      ..strokeWidth = 1.15
       ..shader = const LinearGradient(
         begin: Alignment(-0.9, -1),
         end: Alignment(0.95, 1),
         stops: [0, 0.28, 0.62, 1],
         colors: [
-          Color(0xA8FFE7C4),
-          Color(0x50FFDBAA),
-          Color(0x22FFC978),
-          Color(0x82FFE7C4),
+          Color(0xF2FFFFFF),
+          Color(0x8CFFFFFF),
+          Color(0x38FFBE73),
+          Color(0xBFFFFFFF),
         ],
       ).createShader(rect);
     canvas.drawRRect(edge, paint);
@@ -1075,28 +1085,28 @@ InputDecoration _glassFieldDecoration(String label) {
   return InputDecoration(
     labelText: label,
     filled: true,
-    fillColor: const Color(0xFFFFE7C4).withOpacity(0.22),
+    fillColor: Colors.white.withOpacity(0.075),
     labelStyle: _editorTextStyle(15, opacity: 0.62),
     contentPadding: const EdgeInsets.symmetric(horizontal: 26, vertical: 22),
     border: OutlineInputBorder(
       borderRadius: BorderRadius.circular(999),
       borderSide: BorderSide(
-        color: const Color(0xFFFFE7C4).withOpacity(0.58),
-        width: 0.8,
+        color: Colors.white.withOpacity(0.62),
+        width: 1.0,
       ),
     ),
     enabledBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(999),
       borderSide: BorderSide(
-        color: const Color(0xFFFFE7C4).withOpacity(0.58),
-        width: 0.8,
+        color: Colors.white.withOpacity(0.62),
+        width: 1.0,
       ),
     ),
     focusedBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(999),
       borderSide: BorderSide(
-        color: const Color(0xFFFFE7C4).withOpacity(0.82),
-        width: 0.9,
+        color: Colors.white.withOpacity(0.86),
+        width: 1.1,
       ),
     ),
   );
@@ -1109,16 +1119,16 @@ BoxDecoration _gradientFieldDecorationBox() {
       end: const Alignment(0.9, 1),
       stops: const [0, 0.34, 0.72, 1],
       colors: [
-        const Color(0xFFFFE7C4).withOpacity(0.30),
-        const Color(0xFFFFDBAA).withOpacity(0.13),
-        const Color(0xFFFFC978).withOpacity(0.10),
-        const Color(0xFFFFE7C4).withOpacity(0.20),
+        Colors.white.withOpacity(0.19),
+        Colors.white.withOpacity(0.055),
+        const Color(0xFFFFB04A).withOpacity(0.035),
+        Colors.white.withOpacity(0.105),
       ],
     ),
     borderRadius: BorderRadius.circular(999),
     border: Border.all(
-      color: const Color(0xFFFFE7C4).withOpacity(0.58),
-      width: 0.8,
+      color: Colors.white.withOpacity(0.68),
+      width: 1.0,
     ),
     boxShadow: [
       BoxShadow(
@@ -1716,17 +1726,67 @@ class _StoryGlassCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(30),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
-        child: Container(
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.32),
-            borderRadius: BorderRadius.circular(30),
-            border: Border.all(color: Colors.white.withOpacity(0.76)),
+    const radius = 30.0;
+    final borderRadius = BorderRadius.circular(radius);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: borderRadius,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.055),
+            blurRadius: 18,
+            spreadRadius: -8,
+            offset: const Offset(0, 10),
           ),
-          child: child,
+          BoxShadow(
+            color: _storyOrange.withOpacity(0.13),
+            blurRadius: 30,
+            spreadRadius: -10,
+            offset: const Offset(0, 14),
+          ),
+          BoxShadow(
+            color: Colors.white.withOpacity(0.55),
+            blurRadius: 12,
+            spreadRadius: -5,
+            offset: const Offset(-2, -4),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: borderRadius,
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 42, sigmaY: 48),
+          child: Stack(
+            fit: StackFit.passthrough,
+            children: [
+              Positioned.fill(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    borderRadius: borderRadius,
+                    gradient: LinearGradient(
+                      begin: const Alignment(-0.9, -1),
+                      end: const Alignment(0.9, 1),
+                      stops: const [0, 0.34, 0.72, 1],
+                      colors: [
+                        Colors.white.withOpacity(0.19),
+                        Colors.white.withOpacity(0.055),
+                        const Color(0xFFFFB04A).withOpacity(0.035),
+                        Colors.white.withOpacity(0.105),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const Positioned.fill(
+                child: IgnorePointer(
+                  child: CustomPaint(
+                    painter: _EditorGlassEdgePainter(radius: radius),
+                  ),
+                ),
+              ),
+              child,
+            ],
+          ),
         ),
       ),
     );
