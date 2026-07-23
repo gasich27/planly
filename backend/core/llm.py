@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import re
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
@@ -54,7 +54,11 @@ def _log_retry_attempt(retry_state: Any) -> None:
     )
 
 
-def _prompt(text: str, period: str) -> tuple[str, str]:
+def _prompt(
+    text: str,
+    period: str,
+    target_date: str | None = None,
+) -> tuple[str, str]:
     now = datetime.now(timezone.utc)
     today = now.date().isoformat()
     system = (
@@ -72,6 +76,18 @@ def _prompt(text: str, period: str) -> tuple[str, str]:
         "Если пользователь называет время, обязательно запиши его в scheduled_at. "
         "Если дата не названа, используй текущую дату. Не выдумывай задачи вне запроса."
     )
+    system += (
+        " CRITICAL: preserve every distinct action from the user request as a separate task. "
+        "If the user lists N actions, return N task objects. Never merge unrelated actions. "
+        "Commas, semicolons, numbered items, new lines, and conjunctions may separate tasks. "
+        "Do not omit, summarize, or replace requested actions."
+    )
+    if target_date:
+        system += (
+            f" TARGET_DATE={target_date} is mandatory and overrides every date in the user text. "
+            "Set deadline to TARGET_DATE for every task. For scheduled_at, preserve the requested "
+            "time but use TARGET_DATE as the calendar date."
+        )
     user = (
         f"Текущая дата UTC: {today}\n"
         f"Период интерфейса: {period}\n"
@@ -88,8 +104,13 @@ def _prompt(text: str, period: str) -> tuple[str, str]:
     before_sleep=_log_retry_attempt,
     reraise=True,
 )
-def _request_plan_content(text: str, period: str, settings: Settings) -> str:
-    system_prompt, user_prompt = _prompt(text, period)
+def _request_plan_content(
+    text: str,
+    period: str,
+    settings: Settings,
+    target_date: str | None = None,
+) -> str:
+    system_prompt, user_prompt = _prompt(text, period, target_date)
     payload = json.dumps(
         {
             "model": settings.ollama_model,
@@ -128,11 +149,27 @@ def _request_plan_content(text: str, period: str, settings: Settings) -> str:
     return content
 
 
-def generate_plan(text: str, period: str, settings: Settings) -> Plan:
+def generate_plan(
+    text: str,
+    period: str,
+    settings: Settings,
+    target_date: str | None = None,
+) -> Plan:
     try:
-        content = _request_plan_content(text, period, settings)
+        content = _request_plan_content(text, period, settings, target_date)
         payload = json.loads(_extract_json_payload(content))
-        return Plan.model_validate(payload)
+        plan = Plan.model_validate(payload)
+        if target_date:
+            selected_date = date.fromisoformat(target_date)
+            for task in plan.tasks:
+                task.deadline = selected_date.isoformat()
+                if task.scheduled_at is not None:
+                    task.scheduled_at = task.scheduled_at.replace(
+                        year=selected_date.year,
+                        month=selected_date.month,
+                        day=selected_date.day,
+                    )
+        return plan
     except (json.JSONDecodeError, ValueError, ValidationError) as exc:
         return _fallback_plan(str(exc))
 

@@ -152,7 +152,11 @@ class PlannerProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> createPlanFromText(String text, {String? period}) async {
+  Future<void> createPlanFromText(
+    String text, {
+    String? period,
+    DateTime? targetDate,
+  }) async {
     final command = text.trim();
     if (command.isEmpty) {
       return;
@@ -161,7 +165,11 @@ class PlannerProvider extends ChangeNotifier {
     error = null;
     notifyListeners();
     try {
-      await _apiService.generatePlan(command, period ?? dashboardContext);
+      await _apiService.generatePlan(
+        command,
+        period ?? dashboardContext,
+        targetDate: targetDate,
+      );
       await loadPlans();
     } on ApiException catch (e) {
       error = e.message;
@@ -222,13 +230,17 @@ class PlannerProvider extends ChangeNotifier {
     return <PlanModel>[];
   }
 
-  Future<void> createPlanFromAudio(File audio) async {
+  Future<void> createPlanFromAudio(File audio, {DateTime? targetDate}) async {
     isLoading = true;
     error = null;
     notifyListeners();
     try {
       final transcript = await _apiService.transcribeAudio(audio);
-      final plan = await _apiService.generatePlan(transcript, 'day');
+      final plan = await _apiService.generatePlan(
+        transcript,
+        'day',
+        targetDate: targetDate ?? DateTime.now(),
+      );
       await loadPlans();
       selectedPlan = _findPlanById(plan.id) ?? plan;
       if (!plans.any((item) => item.id == plan.id)) {

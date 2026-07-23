@@ -86,7 +86,11 @@ Placement: ${result.placement} the selected date range.''';
     if (isEdit && provider.plans.isNotEmpty) {
       await provider.aiEditPlan(provider.plans.first.id, command);
     } else {
-      await provider.createPlanFromText(command, period: result.period);
+      await provider.createPlanFromText(
+        command,
+        period: result.period,
+        targetDate: result.dateRange.start,
+      );
     }
   }
 
@@ -196,10 +200,17 @@ Placement: ${result.placement} the selected date range.''';
       }
       final text = _commandController.text.trim();
       if (text.isNotEmpty) {
-        await provider.createPlanFromText(text, period: _backendContext);
+        await provider.createPlanFromText(
+          text,
+          period: _backendContext,
+          targetDate: DateTime.now(),
+        );
         _commandController.clear();
       } else if (_audioPath != null) {
-        await provider.createPlanFromAudio(File(_audioPath!));
+        await provider.createPlanFromAudio(
+          File(_audioPath!),
+          targetDate: DateTime.now(),
+        );
         _audioPath = null;
       } else {
         _showMessage('Type a command or record your voice.');

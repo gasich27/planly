@@ -78,7 +78,11 @@ class ApiService {
     }
   }
 
-  Future<PlanModel> generatePlan(String text, String period) async {
+  Future<PlanModel> generatePlan(
+    String text,
+    String period, {
+    DateTime? targetDate,
+  }) async {
     try {
       final response = await _client
           .post(
@@ -90,6 +94,8 @@ class ApiService {
             body: jsonEncode(<String, dynamic>{
               'text': text,
               'period': period,
+              if (targetDate != null)
+                'target_date': targetDate.toIso8601String().substring(0, 10),
             }),
           )
           .timeout(ApiConfig.timeout);

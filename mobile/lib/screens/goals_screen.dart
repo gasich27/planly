@@ -140,8 +140,9 @@ class _GoalsScreenState extends State<GoalsScreen>
     setState(() => _voiceState = _VoiceState.processing);
     try {
       await provider.createPlanFromText(
-        '$text\nApply this command to ${DateFormat('yyyy-MM-dd').format(_selectedDate)}.',
+        text,
         period: 'day',
+        targetDate: _selectedDate,
       );
       _commandController.clear();
       await provider.loadGoalsDashboard(_selectedDate);

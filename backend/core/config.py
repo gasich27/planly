@@ -30,7 +30,7 @@ def get_settings() -> Settings:
     load_dotenv()
     return Settings(
         ollama_base_url=_read_setting("OLLAMA_BASE_URL", "http://127.0.0.1:11434"),
-        ollama_model=_read_setting("OLLAMA_MODEL", "qwen2.5:7b"),
+        ollama_model=_read_setting("OLLAMA_MODEL", "qwen2.5:3b"),
         ollama_models_dir=_read_setting("OLLAMA_MODELS", "D:/Ollama/Models"),
         whisper_model=_read_setting("WHISPER_MODEL", "base"),
         whisper_language=_read_setting("WHISPER_LANGUAGE", "ru"),

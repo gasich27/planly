@@ -21,7 +21,7 @@ Set the model directory once, restart Ollama, and download the default model:
 
 ```powershell
 [Environment]::SetEnvironmentVariable("OLLAMA_MODELS", "D:\Ollama\Models", "User")
-ollama pull qwen2.5:7b
+ollama pull qwen2.5:3b
 ```
 
 Ollama must be running while the backend generates or edits plans. LM Studio and OpenAI-compatible endpoints are not used.
@@ -45,7 +45,7 @@ Optional `backend/.env` values:
 
 ```env
 OLLAMA_BASE_URL=http://127.0.0.1:11434
-OLLAMA_MODEL=qwen2.5:7b
+OLLAMA_MODEL=qwen2.5:3b
 OLLAMA_MODELS=D:/Ollama/Models
 WHISPER_MODEL=base
 WHISPER_LANGUAGE=ru

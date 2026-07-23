@@ -38,6 +38,7 @@ app.add_middleware(
 class PlanRequest(BaseModel):
     text: str = Field(min_length=1)
     period: str = Field(default="day")
+    target_date: date | None = None
 
 
 class TaskStatusRequest(BaseModel):
@@ -298,7 +299,16 @@ async def api_plan(payload: PlanRequest) -> JSONResponse:
         if not text:
             raise ValueError("text must not be empty")
 
-        plan: Plan = await asyncio.to_thread(generate_plan, text, period, settings)
+        target_date = payload.target_date
+        plan: Plan = await asyncio.to_thread(
+            generate_plan,
+            text,
+            period,
+            settings,
+            target_date.isoformat() if target_date else None,
+        )
+        if not plan.tasks:
+            raise ValueError(plan.notes or "Ollama returned an empty plan")
         plan_id = await asyncio.to_thread(db.save_plan, text, plan, period)
         await asyncio.to_thread(
             append_plan_history_file,
@@ -309,10 +319,10 @@ async def api_plan(payload: PlanRequest) -> JSONResponse:
             period,
         )
 
-        content = plan.model_dump(mode="json")
-        content["id"] = plan_id
-        content["period"] = period
-        return JSONResponse(content=content)
+        saved_plan = await asyncio.to_thread(db.get_plan_with_tasks, plan_id)
+        if saved_plan is None:
+            raise RuntimeError(f"Plan {plan_id} was saved but could not be loaded")
+        return JSONResponse(content=saved_plan)
     except (ValueError, TypeError) as exc:
         return _json_error("plan_error", str(exc), 400)
     except Exception as exc:
